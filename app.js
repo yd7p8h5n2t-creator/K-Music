@@ -1,7 +1,7 @@
 /* K-MUSIC V4 — Liquid Glass + Playlists */
 const $=id=>document.getElementById(id);
 const audio=$('audio'),musicInput=$('musicInput'),addMusic=$('addMusic'),addFirstMusic=$('addFirstMusic'),library=$('library'),search=$('search'),songCount=$('songCount');
-const sectionLabel=$('sectionLabel'),sectionTitle=$('sectionTitle'),newPlaylistTop=$('newPlaylistTop');
+const sectionLabel=$('sectionLabel'),sectionTitle=$('sectionTitle'),newPlaylistTop=$('newPlaylistTop'),importDeezerTop=$('importDeezerTop');
 const bottomLiquidNav=$('bottomLiquidNav'),liquidTabs=$('bottomLiquidShell'),liquidIndicator=$('liquidIndicator'),pageChrome=$('pageChrome');
 const miniPlayer=$('miniPlayer'),miniCover=$('miniCover'),miniTitle=$('miniTitle'),miniArtist=$('miniArtist'),miniPlay=$('miniPlay'),miniPrevious=$('miniPrevious'),miniNext=$('miniNext'),miniProgress=$('miniProgress'),miniEq=$('miniEq'),openPlayer=$('openPlayer');
 const playerScreen=$('playerScreen'),playerBackdrop=$('playerBackdrop'),closePlayer=$('closePlayer'),coverStage=$('coverStage'),bigCover=$('bigCover'),bigTitle=$('bigTitle'),bigArtist=$('bigArtist'),bigAlbum=$('bigAlbum'),playerFavorite=$('playerFavorite'),play=$('play'),previous=$('previous'),next=$('next'),shuffle=$('shuffle'),repeat=$('repeat'),progress=$('progress'),currentTime=$('currentTime'),duration=$('duration');
@@ -79,6 +79,7 @@ musicInput.addEventListener('change',async e=>{
         songs.push(song);
     }
     musicInput.value='';
+    await relinkDeezerPlaylists();
     render();
 });
 function readMetadata(file){
@@ -96,20 +97,6 @@ function readMetadata(file){
             },
             onError:()=>resolve(null)
         });
-    });
-}
-
-
-// iOS-safe navigation: event delegation keeps taps working even if the
-// individual tab listeners or pointer gestures are interrupted by Safari.
-if(liquidTabs){
-    liquidTabs.addEventListener('click',event=>{
-        const tab=event.target.closest('.liquid-tab');
-        if(!tab)return;
-        const view=tab.dataset.view;
-        if(!view)return;
-        event.preventDefault();
-        setView(view,{clientX:event.clientX,clientY:event.clientY});
     });
 }
 
@@ -140,36 +127,131 @@ function spawnLiquidRipple(clientX,clientY){
     ripple.addEventListener('animationend',()=>ripple.remove(),{once:true});
 }
 
-function setView(view,options={}){
-    const clientX=options.clientX;
-    const clientY=options.clientY;
+async function setView(view,{clientX=null,clientY=null,skipTransition=false}={}){
+    if(!viewOrder.includes(view)||view===currentView||isTransitioning)return;
 
-    if(Number.isFinite(clientX)&&Number.isFinite(clientY)){
-        try{ spawnLiquidRipple(clientX,clientY); }catch(e){}
+    const oldIndex=tabIndex(currentView);
+    const newIndex=tabIndex(view);
+    const direction=newIndex>oldIndex?'left':'right';
+
+    if(clientX!==null&&clientY!==null)spawnLiquidRipple(clientX,clientY);
+
+    liquidTabs.classList.remove('nav-pulse');
+    void liquidTabs.offsetWidth;
+    liquidTabs.classList.add('nav-pulse');
+
+    syncLiquidNav(view);
+
+    if(skipTransition){
+        currentView=view;
+        activePlaylistId=null;
+        search.value='';
+        search.placeholder=view==='playlists'?'Rechercher une playlist…':'Titre, artiste, album…';
+        render();
+        return;
     }
 
-    activePlaylistId=null;
-    currentView=view;
+    isTransitioning=true;
+    library.classList.remove('page-enter-left','page-enter-right','page-exit-left','page-exit-right');
+    library.classList.add(direction==='left'?'page-exit-left':'page-exit-right');
 
-    try{ syncLiquidNav(view); }catch(e){}
+    await new Promise(resolve=>setTimeout(resolve,230));
+
+    currentView=view;
+    activePlaylistId=null;
+    search.value='';
+    search.placeholder=view==='playlists'?'Rechercher une playlist…':'Titre, artiste, album…';
+
     render();
 
-    // Purely visual transition. Navigation must never depend on animation support.
-    if(!options.skipTransition && pageStage){
-        pageStage.classList.remove('km-page-fade');
-        requestAnimationFrame(()=>{
-            pageStage.classList.add('km-page-fade');
-            window.setTimeout(()=>pageStage.classList.remove('km-page-fade'),220);
-        });
-    }
+    library.classList.remove('page-exit-left','page-exit-right');
+    library.classList.add(direction==='left'?'page-enter-right':'page-enter-left');
+
+    pageChrome.classList.remove('chrome-bump');
+    void pageChrome.offsetWidth;
+    pageChrome.classList.add('chrome-bump');
+
+    setTimeout(()=>{
+        library.classList.remove('page-enter-left','page-enter-right');
+        isTransitioning=false;
+    },520);
 }
 
+document.querySelectorAll('.liquid-tab').forEach(btn=>{
+    btn.addEventListener('click',e=>setView(btn.dataset.view,{clientX:e.clientX,clientY:e.clientY}));
+});
+
+let tabDrag=null;
+
+liquidTabs.addEventListener('pointerdown',e=>{
+    const rect=liquidTabs.getBoundingClientRect();
+    tabDrag={
+        rect,
+        startX:e.clientX,
+        currentX:e.clientX
+    };
+
+    liquidTabs.classList.add('dragging');
+    liquidTabs.setPointerCapture?.(e.pointerId);
+});
+
+liquidTabs.addEventListener('pointermove',e=>{
+    if(!tabDrag)return;
+
+    tabDrag.currentX=e.clientX;
+
+    const inner=tabDrag.rect.width-10;
+    const segment=inner/3;
+    const raw=(e.clientX-tabDrag.rect.left-5)/segment-.5;
+    const clamped=Math.max(0,Math.min(2,raw));
+
+    liquidIndicator.style.transform=`translateX(${clamped*100}%)`;
+    liquidTabs.style.setProperty('--tab-index',clamped);
+});
+
+liquidTabs.addEventListener('pointerup',e=>{
+    if(!tabDrag)return;
+
+    const segment=(tabDrag.rect.width-10)/3;
+    const idx=Math.max(
+        0,
+        Math.min(
+            2,
+            Math.floor((e.clientX-tabDrag.rect.left-5)/segment)
+        )
+    );
+
+    const moved=Math.abs(e.clientX-tabDrag.startX);
+    const target=viewOrder[idx];
+
+    tabDrag=null;
+    liquidTabs.classList.remove('dragging');
+    liquidIndicator.style.transform='';
+
+    if(target===currentView){
+        syncLiquidNav(currentView);
+        if(moved<8)spawnLiquidRipple(e.clientX,e.clientY);
+        return;
+    }
+
+    setView(target,{clientX:e.clientX,clientY:e.clientY});
+});
+
+liquidTabs.addEventListener('pointercancel',()=>{
+    tabDrag=null;
+    liquidTabs.classList.remove('dragging');
+    liquidIndicator.style.transform='';
+    syncLiquidNav(currentView);
+});
+
+/* ---------- Render ---------- */
 function render(){
     const isDashboard=currentView==='all'&&!activePlaylistId;
 
     pageChrome.classList.toggle('dashboard-hidden',isDashboard);
 
     newPlaylistTop.classList.toggle('hidden',currentView!=='playlists');
+    importDeezerTop.classList.toggle('hidden',currentView!=='playlists');
 
     if(activePlaylistId){
         renderPlaylistDetail();
@@ -377,6 +459,12 @@ function renderPlaylists(){
     create.addEventListener('click',openCreatePlaylistSheet);
     grid.appendChild(create);
 
+    const deezer=document.createElement('article');
+    deezer.className='playlist-card deezer-import-card';
+    deezer.innerHTML=`<div class="playlist-mosaic"><span class="deezer-mark">D</span></div><h3>Importer Deezer</h3><p>Depuis un lien de playlist</p>`;
+    deezer.addEventListener('click',openDeezerImportSheet);
+    grid.appendChild(deezer);
+
     visible.forEach((playlist,i)=>{
         const card=document.createElement('article');
         card.className='playlist-card';
@@ -445,6 +533,330 @@ function renderPlaylistDetail(){
 }
 
 search.addEventListener('input',render);
+
+
+/* ---------- Deezer import ---------- */
+importDeezerTop.addEventListener('click',openDeezerImportSheet);
+
+function openDeezerImportSheet(){
+    showSheet('Importer depuis Deezer',`
+        <p class="deezer-help">
+            Colle le lien d’une playlist Deezer publique. K-Music importe son nom et sa liste de morceaux,
+            puis associe automatiquement les titres déjà présents dans ta bibliothèque.
+        </p>
+        <input id="deezerUrlInput" class="playlist-name-input" inputmode="url"
+               placeholder="https://www.deezer.com/playlist/..." autocomplete="off">
+        <button id="deezerFetchButton" class="sheet-primary pressable">Analyser la playlist</button>
+        <div id="deezerImportStatus" class="deezer-import-status"></div>
+        <div id="deezerImportResult"></div>
+    `);
+
+    $('deezerFetchButton').addEventListener('click',analyseDeezerPlaylist);
+}
+
+function extractDeezerPlaylistId(value){
+    const text=String(value||'').trim();
+
+    const urlMatch=text.match(/deezer\.com\/(?:[a-z]{2}\/)?playlist\/(\d+)/i);
+    if(urlMatch)return urlMatch[1];
+
+    if(/^\d+$/.test(text))return text;
+
+    return null;
+}
+
+async function analyseDeezerPlaylist(){
+    const input=$('deezerUrlInput');
+    const status=$('deezerImportStatus');
+    const result=$('deezerImportResult');
+    const button=$('deezerFetchButton');
+
+    const playlistId=extractDeezerPlaylistId(input.value);
+
+    if(!playlistId){
+        status.textContent='Lien Deezer non reconnu.';
+        return;
+    }
+
+    status.textContent='Lecture de la playlist Deezer…';
+    result.innerHTML='';
+    button.disabled=true;
+    button.style.opacity='.55';
+
+    try{
+        const data=await fetchDeezerPlaylistData(playlistId);
+
+        if(!data||!data.tracks||!data.tracks.length){
+            throw new Error('Playlist vide ou inaccessible');
+        }
+
+        const mapped=data.tracks.map(track=>{
+            const local=findLocalSongForDeezerTrack(track);
+            return {track,local};
+        });
+
+        const matched=mapped.filter(x=>x.local).length;
+        const preview=mapped.slice(0,8).map(({track,local})=>`
+            <div class="deezer-track-preview">
+                ${track.cover?`<img src="${track.cover}" alt="">`:`<div class="sheet-song-cover">♪</div>`}
+                <div class="dz-copy">
+                    <b>${escapeHTML(track.title)}</b>
+                    <span>${escapeHTML(track.artist)}</span>
+                </div>
+                <span class="deezer-match ${local?'ok':'missing'}">${local?'✓ trouvé':'manquant'}</span>
+            </div>
+        `).join('');
+
+        status.textContent='';
+        result.innerHTML=`
+            <div class="deezer-result">
+                <strong>${escapeHTML(data.name)}</strong>
+                <p>${data.tracks.length} morceaux Deezer • ${matched} déjà présents dans K-Music</p>
+                <div>${preview}</div>
+                ${data.tracks.length>8?`<p>+ ${data.tracks.length-8} autres morceaux</p>`:''}
+            </div>
+            <button id="confirmDeezerImport" class="sheet-primary pressable" style="margin-top:12px">
+                Créer la playlist
+            </button>
+            <button id="cancelDeezerImport" class="sheet-secondary pressable">Annuler</button>
+        `;
+
+        $('confirmDeezerImport').addEventListener('click',()=>confirmDeezerImport(data,mapped));
+        $('cancelDeezerImport').addEventListener('click',hideSheet);
+    }catch(error){
+        console.error(error);
+        status.innerHTML=`Impossible de lire directement cette playlist depuis Safari.<br>
+        Essaie une playlist publique. Si Deezer bloque la requête navigateur, utilise l’import JSON proposé ci-dessous.`;
+
+        result.innerHTML=`
+            <button id="deezerJsonFallback" class="sheet-secondary pressable">
+                Importer un fichier JSON Deezer
+            </button>
+            <input id="deezerJsonInput" type="file" accept=".json,application/json" hidden>
+        `;
+
+        $('deezerJsonFallback').addEventListener('click',()=>$('deezerJsonInput').click());
+        $('deezerJsonInput').addEventListener('change',handleDeezerJsonFallback);
+    }finally{
+        button.disabled=false;
+        button.style.opacity='';
+    }
+}
+
+async function fetchDeezerPlaylistData(id){
+    /*
+      Deezer's public playlist endpoint is useful for metadata, but direct browser
+      fetches can be blocked by CORS. Try the direct request first so K-Music
+      remains serverless; if Safari rejects it, the UI offers JSON import.
+    */
+    const playlistRes=await fetch(`https://api.deezer.com/playlist/${id}`);
+    if(!playlistRes.ok)throw new Error(`Deezer ${playlistRes.status}`);
+
+    const playlist=await playlistRes.json();
+    if(playlist.error)throw new Error(playlist.error.message||'Erreur Deezer');
+
+    let tracks=[];
+    let page=playlist.tracks;
+
+    while(page){
+        if(Array.isArray(page.data))tracks.push(...page.data);
+        if(!page.next)break;
+
+        const nextRes=await fetch(page.next);
+        if(!nextRes.ok)break;
+        page=await nextRes.json();
+    }
+
+    return {
+        id:String(id),
+        name:playlist.title||`Playlist Deezer ${id}`,
+        picture:playlist.picture_xl||playlist.picture_big||playlist.picture_medium||null,
+        tracks:tracks.map(normalizeDeezerTrack)
+    };
+}
+
+function normalizeDeezerTrack(track){
+    return {
+        deezerId:String(track.id||''),
+        title:track.title_short||track.title||'Titre inconnu',
+        artist:track.artist?.name||'Artiste inconnu',
+        album:track.album?.title||'Album inconnu',
+        cover:track.album?.cover_big||track.album?.cover_medium||track.album?.cover||null
+    };
+}
+
+function normalizeMatchText(value){
+    return String(value||'')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g,'')
+        .replace(/\([^)]*\)|\[[^\]]*\]/g,' ')
+        .replace(/\b(feat|ft|featuring)\b.*$/i,' ')
+        .replace(/[^a-z0-9]+/g,' ')
+        .trim();
+}
+
+function findLocalSongForDeezerTrack(track){
+    const dt=normalizeMatchText(track.title);
+    const da=normalizeMatchText(track.artist);
+
+    let best=null;
+    let bestScore=0;
+
+    for(const song of songs){
+        const st=normalizeMatchText(song.title);
+        const sa=normalizeMatchText(song.artist);
+        let score=0;
+
+        if(st===dt)score+=7;
+        else if(st.includes(dt)||dt.includes(st))score+=4;
+
+        if(sa===da)score+=5;
+        else if(sa.includes(da)||da.includes(sa))score+=2;
+
+        if(score>bestScore){
+            bestScore=score;
+            best=song;
+        }
+    }
+
+    return bestScore>=8?best:null;
+}
+
+async function confirmDeezerImport(data,mapped){
+    const matchedIds=mapped.filter(x=>x.local).map(x=>x.local.id);
+
+    const playlist={
+        id:crypto.randomUUID(),
+        name:data.name,
+        songIds:[...new Set(matchedIds)],
+        createdAt:Date.now(),
+        source:'deezer',
+        deezerPlaylistId:data.id||null,
+        deezerPicture:data.picture||null,
+        deezerTracks:mapped.map(({track,local})=>({
+            ...track,
+            localSongId:local?.id||null
+        }))
+    };
+
+    await dbPut('playlists',playlist);
+    playlists.push(playlist);
+
+    hideSheet();
+    currentView='playlists';
+    syncLiquidNav('playlists');
+    activePlaylistId=playlist.id;
+    render();
+
+    if(mapped.some(x=>!x.local)){
+        setTimeout(()=>openMissingTracksSheet(playlist.id),350);
+    }
+}
+
+function openMissingTracksSheet(playlistId){
+    const playlist=playlists.find(p=>p.id===playlistId);
+    if(!playlist||!Array.isArray(playlist.deezerTracks))return;
+
+    const missing=playlist.deezerTracks.filter(t=>!t.localSongId);
+    if(!missing.length)return;
+
+    showSheet('Morceaux manquants',`
+        <p class="deezer-help">
+            ${missing.length} morceau${missing.length>1?'x':''} de Deezer ne ${missing.length>1?'sont':'est'} pas encore dans K-Music.
+            Ajoute tes fichiers audio plus tard : K-Music pourra les rattacher à la playlist.
+        </p>
+        <div class="sheet-song-list">
+            ${missing.slice(0,50).map(track=>`
+                <div class="sheet-song">
+                    <div class="sheet-song-cover">${track.cover?`<img src="${track.cover}" alt="">`:'♪'}</div>
+                    <div class="sheet-song-copy">
+                        <strong>${escapeHTML(track.title)}</strong>
+                        <span>${escapeHTML(track.artist)}</span>
+                    </div>
+                    <span class="deezer-match missing">manquant</span>
+                </div>
+            `).join('')}
+        </div>
+        <button id="closeMissingTracks" class="sheet-primary pressable" style="margin-top:12px">Compris</button>
+    `);
+
+    $('closeMissingTracks').addEventListener('click',hideSheet);
+}
+
+async function handleDeezerJsonFallback(event){
+    const file=event.target.files?.[0];
+    if(!file)return;
+
+    const status=$('deezerImportStatus');
+
+    try{
+        const raw=JSON.parse(await file.text());
+        const source=raw.data?raw:(raw.tracks||raw.title?raw:null);
+        if(!source)throw new Error('Format JSON non reconnu');
+
+        let rawTracks=[];
+        let name='Playlist Deezer';
+
+        if(Array.isArray(raw.data)){
+            rawTracks=raw.data;
+        }else if(Array.isArray(raw.tracks?.data)){
+            rawTracks=raw.tracks.data;
+            name=raw.title||name;
+        }else if(Array.isArray(raw.tracks)){
+            rawTracks=raw.tracks;
+            name=raw.title||raw.name||name;
+        }else{
+            throw new Error('Aucun morceau trouvé');
+        }
+
+        const data={
+            id:null,
+            name,
+            picture:raw.picture_xl||raw.picture_big||null,
+            tracks:rawTracks.map(normalizeDeezerTrack)
+        };
+
+        const mapped=data.tracks.map(track=>({
+            track,
+            local:findLocalSongForDeezerTrack(track)
+        }));
+
+        await confirmDeezerImport(data,mapped);
+    }catch(error){
+        console.error(error);
+        status.textContent='Ce fichier JSON ne ressemble pas à un export Deezer.';
+    }
+}
+
+async function relinkDeezerPlaylists(){
+    let changed=false;
+
+    for(const playlist of playlists){
+        if(!Array.isArray(playlist.deezerTracks))continue;
+
+        let playlistChanged=false;
+
+        for(const track of playlist.deezerTracks){
+            if(track.localSongId&&songs.some(s=>s.id===track.localSongId))continue;
+
+            const local=findLocalSongForDeezerTrack(track);
+
+            if(local){
+                track.localSongId=local.id;
+                if(!playlist.songIds.includes(local.id))playlist.songIds.push(local.id);
+                playlistChanged=true;
+            }
+        }
+
+        if(playlistChanged){
+            await dbPut('playlists',playlist);
+            changed=true;
+        }
+    }
+
+    if(changed)render();
+}
 
 
 /* ---------- Playlist sheets ---------- */

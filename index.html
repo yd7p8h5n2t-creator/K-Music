@@ -10,7 +10,7 @@
     <title>K-Music</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
-    <link rel="stylesheet" href="style.css?v=7.2">
+    <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
     <div class="ambient" aria-hidden="true">
@@ -46,6 +46,7 @@
 
                 <div class="section-actions">
                     <span id="songCount" class="song-count">0 morceau</span>
+                    <button id="importDeezerTop" class="deezer-import-top pressable hidden" aria-label="Importer depuis Deezer">D</button>
                     <button id="newPlaylistTop" class="tiny-add pressable hidden" aria-label="Créer une playlist">+</button>
                 </div>
             </div>
@@ -161,7 +162,7 @@
 
     <audio id="audio" preload="metadata"></audio>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
-    <script src="app.js?v=7.2"></script>
+    <script src="app.js?v=7"></script>
     <script>
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("./sw.js")
