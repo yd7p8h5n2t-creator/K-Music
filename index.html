@@ -1,387 +1,140 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#08080a">
-
-    <meta
-        name="apple-mobile-web-app-capable"
-        content="yes"
-    >
-
-    <meta
-        name="apple-mobile-web-app-status-bar-style"
-        content="black-translucent"
-    >
-
-    <meta
-        name="apple-mobile-web-app-title"
-        content="K-Music"
-    >
-
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="K-Music">
     <title>K-Music</title>
-
     <link rel="manifest" href="manifest.json">
-
-    <link
-    rel="apple-touch-icon"
-    href="icons/icon-192.png"
->
-
-    <link rel="stylesheet" href="style.css">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="style.css?v=3">
 </head>
-
 <body>
+    <div class="ambient" aria-hidden="true">
+        <div class="ambient-orb ambient-orb-a"></div>
+        <div class="ambient-orb ambient-orb-b"></div>
+        <div class="ambient-noise"></div>
+    </div>
 
-    <!-- =========================
-         HEADER
-    ========================== -->
-
-    <header class="topbar">
-
-        <div>
-            <div class="eyebrow">TA MUSIQUE</div>
-            <h1>K-Music</h1>
-        </div>
-
-        <button
-            class="add-button"
-            id="addMusic"
-            aria-label="Ajouter de la musique"
-        >
-            +
-        </button>
-
-        <input
-            type="file"
-            id="musicInput"
-            accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.alac"
-            multiple
-            hidden
-        >
-
-    </header>
-
-
-    <!-- =========================
-         CONTENU PRINCIPAL
-    ========================== -->
-
-    <main>
-
-        <div class="search-box">
-
-            <span>⌕</span>
-
-            <input
-                type="search"
-                id="search"
-                placeholder="Rechercher"
-                autocomplete="off"
-            >
-
-        </div>
-
-
-        <div class="section-header">
-
-            <div>
-                <span class="section-label">BIBLIOTHÈQUE</span>
-                <h2>Mes morceaux</h2>
+    <div class="app-shell">
+        <header class="topbar">
+            <div class="brand-block">
+                <div class="eyebrow"><span class="status-dot"></span>TA MUSIQUE</div>
+                <h1>K-Music</h1>
             </div>
+            <button class="icon-button add-button pressable" id="addMusic" aria-label="Ajouter de la musique"><span>+</span></button>
+            <input type="file" id="musicInput" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.alac" multiple hidden>
+        </header>
 
-            <span id="songCount" class="song-count">
-                0 morceau
-            </span>
-
-        </div>
-
-
-        <div class="filters">
-
-            <button
-                class="filter active"
-                data-filter="all"
-            >
-                Tous
-            </button>
-
-            <button
-                class="filter"
-                data-filter="favorites"
-            >
-                ♥ Favoris
-            </button>
-
-        </div>
-
-
-        <section id="library" class="library">
-
-            <div class="empty">
-
-                <div class="empty-cover">
-                    ♪
+        <main>
+            <section class="hero-panel glass-panel">
+                <div class="hero-copy">
+                    <div class="hero-kicker">BIBLIOTHÈQUE PERSONNELLE</div>
+                    <h2>Tout ton son.<br><span>Sans distraction.</span></h2>
                 </div>
+                <div class="hero-badge">
+                    <div class="hero-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+                    <span id="heroCount">0 titre</span>
+                </div>
+            </section>
 
-                <h3>Ta bibliothèque est vide</h3>
-
-                <p>
-                    Ajoute tes morceaux pour commencer.
-                </p>
-
-                <button
-                    class="primary-button"
-                    id="addFirstMusic"
-                >
-                    Ajouter de la musique
-                </button>
-
+            <div class="search-box glass-panel">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.2-4.2m1.2-5.3a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z"/></svg>
+                <input type="search" id="search" placeholder="Titre, artiste, album…" autocomplete="off">
+                <span class="search-shortcut">K</span>
             </div>
 
-        </section>
-
-    </main>
-
-
-    <!-- =========================
-         MINI PLAYER
-    ========================== -->
-
-    <div
-        class="mini-player hidden"
-        id="miniPlayer"
-    >
-
-        <div
-            class="mini-info"
-            id="openPlayer"
-        >
-
-            <div
-                class="mini-cover"
-                id="miniCover"
-            >
-                ♪
+            <div class="section-header">
+                <div><span class="section-label">COLLECTION</span><h2>Mes morceaux</h2></div>
+                <span id="songCount" class="song-count">0 morceau</span>
             </div>
 
+            <div class="filters" role="tablist">
+                <button class="filter active pressable" data-filter="all" role="tab"><span class="filter-dot"></span>Tous</button>
+                <button class="filter pressable" data-filter="favorites" role="tab"><span>♥</span>Favoris</button>
+            </div>
+
+            <section id="library" class="library">
+                <div class="empty glass-panel">
+                    <div class="empty-cover"><div class="empty-disc">♪</div></div>
+                    <h3>Ta bibliothèque est vide</h3>
+                    <p>Ajoute quelques morceaux et K-Music prend vie.</p>
+                    <button class="primary-button pressable" id="addFirstMusic">Ajouter de la musique</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="mini-player hidden" id="miniPlayer">
+        <div class="mini-glow"></div>
+        <div class="mini-info" id="openPlayer">
+            <div class="mini-cover" id="miniCover">♪</div>
             <div class="mini-text">
-
-                <strong id="miniTitle">
-                    Aucun morceau
-                </strong>
-
-                <span id="miniArtist">
-                    K-Music
-                </span>
-
+                <div class="mini-now"><span class="mini-eq" id="miniEq" aria-hidden="true"><i></i><i></i><i></i></span>EN LECTURE</div>
+                <strong id="miniTitle">Aucun morceau</strong>
+                <span id="miniArtist">K-Music</span>
             </div>
-
         </div>
-
-
-        <button
-            class="mini-control"
-            id="miniPrevious"
-            aria-label="Précédent"
-        >
-            ⏮
-        </button>
-
-
-        <button
-            class="mini-play"
-            id="miniPlay"
-            aria-label="Lecture"
-        >
-            ▶
-        </button>
-
-
-        <button
-            class="mini-control"
-            id="miniNext"
-            aria-label="Suivant"
-        >
-            ⏭
-        </button>
-
-
-        <div class="mini-progress">
-
-            <div id="miniProgress"></div>
-
-        </div>
-
+        <button class="mini-control pressable" id="miniPrevious" aria-label="Précédent">‹</button>
+        <button class="mini-play pressable" id="miniPlay" aria-label="Lecture"><span>▶</span></button>
+        <button class="mini-control pressable" id="miniNext" aria-label="Suivant">›</button>
+        <div class="mini-progress-track"><div class="mini-progress" id="miniProgress"></div></div>
     </div>
 
-
-    <!-- =========================
-         GRAND LECTEUR
-    ========================== -->
-
-    <div
-        class="player-screen"
-        id="playerScreen"
-    >
-
-        <div class="player-header">
-
-            <button
-                id="closePlayer"
-                class="back-button"
-            >
-                ↓
-            </button>
-
-            <span>LECTURE</span>
-
-            <button
-                id="playerFavorite"
-                class="heart-button"
-            >
-                ♡
-            </button>
-
-        </div>
-
-
-        <div class="big-cover-wrapper">
-
-            <div
-                class="big-cover"
-                id="bigCover"
-            >
-                ♪
+    <div class="player-screen" id="playerScreen" aria-hidden="true">
+        <div class="player-backdrop" id="playerBackdrop"></div>
+        <div class="player-vignette"></div>
+        <div class="player-content">
+            <div class="player-header">
+                <button id="closePlayer" class="back-button pressable" aria-label="Fermer"><span>⌄</span></button>
+                <div class="player-heading"><span>LECTURE EN COURS</span><small>K-Music</small></div>
+                <button id="playerFavorite" class="heart-button pressable" aria-label="Favori">♡</button>
             </div>
 
-        </div>
-
-
-        <div class="big-song-info">
-
-            <div>
-
-                <h2 id="bigTitle">
-                    Aucun morceau
-                </h2>
-
-                <p id="bigArtist">
-                    K-Music
-                </p>
-
+            <div class="big-cover-wrapper" id="coverStage">
+                <div class="cover-shadow"></div>
+                <div class="big-cover" id="bigCover"><div class="cover-placeholder"><span>K</span></div></div>
+                <div class="cover-reflection"></div>
             </div>
 
-        </div>
-
-
-        <div class="progress-area">
-
-            <input
-                type="range"
-                id="progress"
-                min="0"
-                max="100"
-                value="0"
-            >
-
-            <div class="time-row">
-
-                <span id="currentTime">
-                    0:00
-                </span>
-
-                <span id="duration">
-                    0:00
-                </span>
-
+            <div class="big-song-info">
+                <div class="song-meta">
+                    <div class="now-playing-pill"><span class="live-dot"></span>NOW PLAYING</div>
+                    <h2 id="bigTitle">Aucun morceau</h2>
+                    <p id="bigArtist">K-Music</p>
+                    <span id="bigAlbum" class="big-album"></span>
+                </div>
             </div>
 
+            <div class="progress-area">
+                <div class="progress-shell"><input type="range" id="progress" min="0" max="100" value="0"></div>
+                <div class="time-row"><span id="currentTime">0:00</span><span id="duration">0:00</span></div>
+            </div>
+
+            <div class="player-controls">
+                <button id="shuffle" class="secondary-control pressable" aria-label="Aléatoire"><span>⇄</span></button>
+                <button id="previous" class="control-button pressable" aria-label="Précédent"><span>◀</span></button>
+                <button id="play" class="big-play pressable" aria-label="Lecture"><span>▶</span></button>
+                <button id="next" class="control-button pressable" aria-label="Suivant"><span>▶</span></button>
+                <button id="repeat" class="secondary-control pressable" aria-label="Répéter"><span>↻</span></button>
+            </div>
+
+            <div class="player-footer"><div class="player-hint"><span></span>Glisse vers le bas pour revenir</div></div>
         </div>
-
-
-        <div class="player-controls">
-
-            <button
-                id="shuffle"
-                class="secondary-control"
-                aria-label="Aléatoire"
-            >
-                🔀
-            </button>
-
-            <button
-                id="previous"
-                class="control-button"
-            >
-                ⏮
-            </button>
-
-            <button
-                id="play"
-                class="big-play"
-            >
-                ▶
-            </button>
-
-            <button
-                id="next"
-                class="control-button"
-            >
-                ⏭
-            </button>
-
-            <button
-                id="repeat"
-                class="secondary-control"
-                aria-label="Répéter"
-            >
-                🔁
-            </button>
-
-        </div>
-
     </div>
 
-
-    <!-- AUDIO -->
-
-    <audio
-        id="audio"
-        preload="metadata"
-    ></audio>
-
-
-    <!-- METADATA -->
-
+    <audio id="audio" preload="metadata"></audio>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
-
-    <!-- APPLICATION -->
-
-    <script src="app.js"></script>
-
+    <script src="app.js?v=3"></script>
     <script>
-    if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("./sw.js")
-            .then(() => {
-                console.log("K-Music offline ready");
-            })
-            .catch(error => {
-                console.error(
-                    "Service Worker error:",
-                    error
-                );
-            });
-    }
-</script>
-
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("./sw.js")
+                .then(() => console.log("K-Music offline ready"))
+                .catch(error => console.error("Service Worker error:", error));
+        }
+    </script>
 </body>
-
 </html>
