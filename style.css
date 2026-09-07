@@ -1653,3 +1653,33 @@ body{
         font-size:11px;
     }
 }
+
+
+/* K-Music V7.1 — stable navigation: no zoom/dezoom */
+.page-stage,
+.page-chrome {
+    transform: none !important;
+    scale: 1 !important;
+    filter: none !important;
+    transform-origin: center top !important;
+}
+
+.page-stage.page-exit-left,
+.page-stage.page-exit-right,
+.page-stage.page-enter-left,
+.page-stage.page-enter-right,
+.page-chrome.page-exit-left,
+.page-chrome.page-exit-right,
+.page-chrome.page-enter-left,
+.page-chrome.page-enter-right {
+    animation: none !important;
+}
+
+.page-stage.km-page-fade {
+    animation: kmPageFade 220ms cubic-bezier(.2,.8,.2,1) both !important;
+}
+
+@keyframes kmPageFade {
+    from { opacity:.30; transform:translateY(7px); }
+    to   { opacity:1; transform:translateY(0); }
+}
