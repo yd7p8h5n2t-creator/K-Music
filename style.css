@@ -534,3 +534,342 @@ body.sheet-open {
         grid-template-columns: 1fr;
     }
 }
+
+
+/* =========================================================
+   K-MUSIC V5 — BOTTOM LIQUID NAV + CINEMATIC PAGE TRANSITIONS
+========================================================= */
+
+body {
+    padding-bottom: calc(160px + env(safe-area-inset-bottom));
+}
+
+main {
+    padding-bottom: 34px;
+}
+
+.bottom-liquid-nav {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    z-index: 60;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.bottom-liquid-shell {
+    --tab-index: 0;
+    position: relative;
+    width: min(100%, 560px);
+    height: 70px;
+    padding: 5px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-radius: 26px;
+    pointer-events: auto;
+    touch-action: pan-y;
+
+    border: 1px solid rgba(255,255,255,.12);
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.045)),
+        rgba(16,16,22,.64);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.12),
+        inset 0 -1px 0 rgba(255,255,255,.03),
+        0 22px 55px rgba(0,0,0,.46),
+        0 6px 16px rgba(0,0,0,.24);
+
+    backdrop-filter: blur(34px) saturate(195%);
+    -webkit-backdrop-filter: blur(34px) saturate(195%);
+
+    overflow: hidden;
+}
+
+.bottom-liquid-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background:
+        radial-gradient(circle at 18% -20%, rgba(255,255,255,.22), transparent 35%),
+        linear-gradient(
+            115deg,
+            transparent 0%,
+            rgba(255,255,255,.035) 30%,
+            rgba(255,255,255,.08) 50%,
+            rgba(255,255,255,.025) 70%,
+            transparent 100%
+        );
+    opacity: .7;
+}
+
+.bottom-liquid-glow {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    left: 0;
+    top: -30px;
+    border-radius: 50%;
+    background: rgba(var(--dynamic-rgb), .26);
+    filter: blur(36px);
+    opacity: .62;
+    transform: translateX(calc(var(--tab-index) * 100%));
+    transition: transform 520ms cubic-bezier(.16,1,.3,1);
+    pointer-events: none;
+}
+
+.bottom-liquid-shell .liquid-indicator {
+    top: 5px;
+    bottom: 5px;
+    left: 5px;
+    width: calc((100% - 10px) / 3);
+    border-radius: 21px;
+    transform: translateX(calc(var(--tab-index) * 100%));
+
+    background:
+        radial-gradient(circle at 35% 0%, rgba(255,255,255,.38), transparent 40%),
+        linear-gradient(
+            145deg,
+            rgba(var(--dynamic-rgb), .36),
+            rgba(255,255,255,.12) 55%,
+            rgba(255,255,255,.075)
+        );
+
+    border: 1px solid rgba(255,255,255,.17);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.26),
+        inset 0 -1px 0 rgba(255,255,255,.04),
+        0 10px 24px rgba(0,0,0,.23),
+        0 0 34px rgba(var(--dynamic-rgb), .12);
+
+    backdrop-filter: blur(28px) saturate(220%);
+    -webkit-backdrop-filter: blur(28px) saturate(220%);
+
+    transition:
+        transform 560ms cubic-bezier(.16,1,.3,1),
+        width 260ms cubic-bezier(.2,.8,.2,1),
+        filter 260ms ease,
+        box-shadow 260ms ease;
+}
+
+.bottom-liquid-shell.dragging .liquid-indicator {
+    transition: none;
+    filter: brightness(1.12) saturate(1.15);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.32),
+        0 10px 28px rgba(0,0,0,.24),
+        0 0 42px rgba(var(--dynamic-rgb), .18);
+}
+
+.bottom-liquid-shell.dragging {
+    transform: scale(1.012);
+}
+
+.bottom-liquid-shell .liquid-tab {
+    position: relative;
+    z-index: 3;
+    height: 100%;
+    padding: 0 6px;
+    border: 0;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: rgba(255,255,255,.48);
+    transition:
+        color 300ms ease,
+        transform 260ms cubic-bezier(.2,.9,.2,1),
+        filter 260ms ease;
+}
+
+.bottom-liquid-shell .liquid-tab.active {
+    color: #fff;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,.26));
+}
+
+.bottom-liquid-shell .liquid-tab:active {
+    transform: scale(.92);
+}
+
+.tab-icon {
+    font-size: 16px;
+    line-height: 1;
+    transform: translateY(1px);
+}
+
+.tab-label {
+    font-size: 10px;
+    font-weight: 760;
+    letter-spacing: -.15px;
+}
+
+/* Mini-player lives above bottom nav */
+.mini-player {
+    bottom: calc(92px + env(safe-area-inset-bottom));
+}
+
+/* Cinematic page transitions */
+.page-stage {
+    position: relative;
+    min-height: 220px;
+    transform-origin: 50% 30%;
+    will-change: transform, opacity, filter;
+}
+
+.page-stage.page-exit-left {
+    animation: pageExitLeft 260ms cubic-bezier(.4,0,.2,1) forwards;
+}
+
+.page-stage.page-exit-right {
+    animation: pageExitRight 260ms cubic-bezier(.4,0,.2,1) forwards;
+}
+
+.page-stage.page-enter-right {
+    animation: pageEnterRight 520ms cubic-bezier(.16,1,.3,1) both;
+}
+
+.page-stage.page-enter-left {
+    animation: pageEnterLeft 520ms cubic-bezier(.16,1,.3,1) both;
+}
+
+.page-chrome.chrome-bump {
+    animation: chromeBump 520ms cubic-bezier(.16,1,.3,1);
+}
+
+@keyframes pageExitLeft {
+    from {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        filter: blur(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(-34px) scale(.985);
+        filter: blur(5px);
+    }
+}
+
+@keyframes pageExitRight {
+    from {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        filter: blur(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(34px) scale(.985);
+        filter: blur(5px);
+    }
+}
+
+@keyframes pageEnterRight {
+    0% {
+        opacity: 0;
+        transform: translateX(48px) scale(.975);
+        filter: blur(7px);
+    }
+    58% {
+        opacity: 1;
+        transform: translateX(-5px) scale(1.004);
+        filter: blur(0);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        filter: blur(0);
+    }
+}
+
+@keyframes pageEnterLeft {
+    0% {
+        opacity: 0;
+        transform: translateX(-48px) scale(.975);
+        filter: blur(7px);
+    }
+    58% {
+        opacity: 1;
+        transform: translateX(5px) scale(1.004);
+        filter: blur(0);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        filter: blur(0);
+    }
+}
+
+@keyframes chromeBump {
+    0% { transform: translateY(0); opacity: .7; }
+    40% { transform: translateY(-3px); opacity: 1; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+
+/* "wow" ripple under the glass */
+.liquid-ripple {
+    position: absolute;
+    z-index: 2;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    pointer-events: none;
+    background:
+        radial-gradient(circle, rgba(255,255,255,.28) 0%, rgba(var(--dynamic-rgb), .18) 32%, transparent 70%);
+    transform: translate(-50%, -50%) scale(.15);
+    opacity: 0;
+    animation: liquidRipple 620ms cubic-bezier(.2,.8,.2,1);
+    filter: blur(.2px);
+}
+
+@keyframes liquidRipple {
+    0% {
+        opacity: .85;
+        transform: translate(-50%, -50%) scale(.12);
+    }
+    55% {
+        opacity: .45;
+        transform: translate(-50%, -50%) scale(1.18);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.75);
+    }
+}
+
+/* subtle lens breathing when changing tabs */
+.bottom-liquid-shell.nav-pulse {
+    animation: navPulse 520ms cubic-bezier(.16,1,.3,1);
+}
+
+@keyframes navPulse {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.025); }
+    65% { transform: scale(.995); }
+    100% { transform: scale(1); }
+}
+
+@media (min-width: 700px) {
+    .bottom-liquid-nav {
+        left: 50%;
+        right: auto;
+        width: min(560px, calc(100% - 24px));
+        transform: translateX(-50%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .page-stage,
+    .page-chrome,
+    .bottom-liquid-shell,
+    .bottom-liquid-shell .liquid-indicator,
+    .bottom-liquid-glow {
+        animation: none !important;
+        transition: none !important;
+    }
+}

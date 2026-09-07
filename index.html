@@ -10,7 +10,7 @@
     <title>K-Music</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
     <div class="ambient" aria-hidden="true">
@@ -36,7 +36,7 @@
                 <span class="search-shortcut">K</span>
             </div>
 
-            <div class="section-header library-heading">
+            <div class="section-header library-heading page-chrome" id="pageChrome">
                 <div>
                     <span class="section-label" id="sectionLabel">COLLECTION</span>
                     <h2 id="sectionTitle">Mes morceaux</h2>
@@ -48,23 +48,7 @@
                 </div>
             </div>
 
-            <div class="liquid-tabs" id="liquidTabs" role="tablist" aria-label="Navigation bibliothèque">
-                <div class="liquid-indicator" id="liquidIndicator"></div>
-
-                <button class="liquid-tab active" data-view="all" role="tab" aria-selected="true">
-                    <span>Musique</span>
-                </button>
-
-                <button class="liquid-tab" data-view="playlists" role="tab" aria-selected="false">
-                    <span>Playlists</span>
-                </button>
-
-                <button class="liquid-tab" data-view="favorites" role="tab" aria-selected="false">
-                    <span>Favoris</span>
-                </button>
-            </div>
-
-            <section id="library" class="library">
+            <section id="library" class="library page-stage">
                 <div class="empty glass-panel">
                     <div class="empty-cover"><div class="empty-disc">♪</div></div>
                     <h3>Ta bibliothèque est vide</h3>
@@ -74,6 +58,29 @@
             </section>
         </main>
     </div>
+
+
+    <nav class="bottom-liquid-nav" id="bottomLiquidNav" aria-label="Navigation principale">
+        <div class="bottom-liquid-shell" id="bottomLiquidShell">
+            <div class="bottom-liquid-glow"></div>
+            <div class="liquid-indicator" id="liquidIndicator"></div>
+
+            <button class="liquid-tab active" data-view="all" role="tab" aria-selected="true">
+                <span class="tab-icon">♫</span>
+                <span class="tab-label">Musique</span>
+            </button>
+
+            <button class="liquid-tab" data-view="playlists" role="tab" aria-selected="false">
+                <span class="tab-icon">▦</span>
+                <span class="tab-label">Playlists</span>
+            </button>
+
+            <button class="liquid-tab" data-view="favorites" role="tab" aria-selected="false">
+                <span class="tab-icon">♥</span>
+                <span class="tab-label">Favoris</span>
+            </button>
+        </div>
+    </nav>
 
     <div class="mini-player hidden" id="miniPlayer">
         <div class="mini-glow"></div>
@@ -152,7 +159,7 @@
 
     <audio id="audio" preload="metadata"></audio>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
     <script>
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("./sw.js")

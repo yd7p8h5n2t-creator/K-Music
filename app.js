@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id);
 const audio=$('audio'),musicInput=$('musicInput'),addMusic=$('addMusic'),addFirstMusic=$('addFirstMusic'),library=$('library'),search=$('search'),songCount=$('songCount');
 const sectionLabel=$('sectionLabel'),sectionTitle=$('sectionTitle'),newPlaylistTop=$('newPlaylistTop');
-const liquidTabs=$('liquidTabs'),liquidIndicator=$('liquidIndicator');
+const bottomLiquidNav=$('bottomLiquidNav'),liquidTabs=$('bottomLiquidShell'),liquidIndicator=$('liquidIndicator'),pageChrome=$('pageChrome');
 const miniPlayer=$('miniPlayer'),miniCover=$('miniCover'),miniTitle=$('miniTitle'),miniArtist=$('miniArtist'),miniPlay=$('miniPlay'),miniPrevious=$('miniPrevious'),miniNext=$('miniNext'),miniProgress=$('miniProgress'),miniEq=$('miniEq'),openPlayer=$('openPlayer');
 const playerScreen=$('playerScreen'),playerBackdrop=$('playerBackdrop'),closePlayer=$('closePlayer'),coverStage=$('coverStage'),bigCover=$('bigCover'),bigTitle=$('bigTitle'),bigArtist=$('bigArtist'),bigAlbum=$('bigAlbum'),playerFavorite=$('playerFavorite'),play=$('play'),previous=$('previous'),next=$('next'),shuffle=$('shuffle'),repeat=$('repeat'),progress=$('progress'),currentTime=$('currentTime'),duration=$('duration');
 const sheetBackdrop=$('sheetBackdrop'),playlistSheet=$('playlistSheet'),sheetTitle=$('sheetTitle'),sheetBody=$('sheetBody'),closeSheet=$('closeSheet');
@@ -51,7 +51,7 @@ async function init(){
     try{
         await openDatabase();
         [songs,playlists]=await Promise.all([dbGetAll('songs'),dbGetAll('playlists')]);
-        render();
+        syncLiquidNav(currentView);render();
     }catch(e){console.error("Impossible d'ouvrir K-Music",e)}
 }
 init();
@@ -99,55 +99,148 @@ function readMetadata(file){
     });
 }
 
-/* ---------- Liquid tabs ---------- */
+/* ---------- Bottom Liquid Glass navigation ---------- */
 const viewOrder=['all','playlists','favorites'];
-function setView(view,{fromDrag=false}={}){
-    if(!viewOrder.includes(view)) return;
-    currentView=view;
-    activePlaylistId=null;
+let isTransitioning=false;
 
-    const idx=viewOrder.indexOf(view);
+function tabIndex(view){return Math.max(0,viewOrder.indexOf(view))}
+
+function syncLiquidNav(view){
+    const idx=tabIndex(view);
     liquidTabs.style.setProperty('--tab-index',idx);
+
     document.querySelectorAll('.liquid-tab').forEach(btn=>{
         const active=btn.dataset.view===view;
         btn.classList.toggle('active',active);
         btn.setAttribute('aria-selected',active?'true':'false');
     });
+}
 
+function spawnLiquidRipple(clientX,clientY){
+    const rect=liquidTabs.getBoundingClientRect();
+    const ripple=document.createElement('span');
+    ripple.className='liquid-ripple';
+    ripple.style.left=`${clientX-rect.left}px`;
+    ripple.style.top=`${clientY-rect.top}px`;
+    liquidTabs.appendChild(ripple);
+    ripple.addEventListener('animationend',()=>ripple.remove(),{once:true});
+}
+
+async function setView(view,{clientX=null,clientY=null,skipTransition=false}={}){
+    if(!viewOrder.includes(view)||view===currentView||isTransitioning)return;
+
+    const oldIndex=tabIndex(currentView);
+    const newIndex=tabIndex(view);
+    const direction=newIndex>oldIndex?'left':'right';
+
+    if(clientX!==null&&clientY!==null)spawnLiquidRipple(clientX,clientY);
+
+    liquidTabs.classList.remove('nav-pulse');
+    void liquidTabs.offsetWidth;
+    liquidTabs.classList.add('nav-pulse');
+
+    syncLiquidNav(view);
+
+    if(skipTransition){
+        currentView=view;
+        activePlaylistId=null;
+        search.value='';
+        search.placeholder=view==='playlists'?'Rechercher une playlist…':'Titre, artiste, album…';
+        render();
+        return;
+    }
+
+    isTransitioning=true;
+    library.classList.remove('page-enter-left','page-enter-right','page-exit-left','page-exit-right');
+    library.classList.add(direction==='left'?'page-exit-left':'page-exit-right');
+
+    await new Promise(resolve=>setTimeout(resolve,230));
+
+    currentView=view;
+    activePlaylistId=null;
     search.value='';
     search.placeholder=view==='playlists'?'Rechercher une playlist…':'Titre, artiste, album…';
+
     render();
+
+    library.classList.remove('page-exit-left','page-exit-right');
+    library.classList.add(direction==='left'?'page-enter-right':'page-enter-left');
+
+    pageChrome.classList.remove('chrome-bump');
+    void pageChrome.offsetWidth;
+    pageChrome.classList.add('chrome-bump');
+
+    setTimeout(()=>{
+        library.classList.remove('page-enter-left','page-enter-right');
+        isTransitioning=false;
+    },520);
 }
-document.querySelectorAll('.liquid-tab').forEach(btn=>btn.addEventListener('click',()=>setView(btn.dataset.view)));
+
+document.querySelectorAll('.liquid-tab').forEach(btn=>{
+    btn.addEventListener('click',e=>setView(btn.dataset.view,{clientX:e.clientX,clientY:e.clientY}));
+});
 
 let tabDrag=null;
+
 liquidTabs.addEventListener('pointerdown',e=>{
     const rect=liquidTabs.getBoundingClientRect();
-    tabDrag={rect,startX:e.clientX,startIndex:viewOrder.indexOf(currentView)};
+    tabDrag={
+        rect,
+        startX:e.clientX,
+        currentX:e.clientX
+    };
+
     liquidTabs.classList.add('dragging');
     liquidTabs.setPointerCapture?.(e.pointerId);
 });
+
 liquidTabs.addEventListener('pointermove',e=>{
-    if(!tabDrag) return;
-    const inner=tabDrag.rect.width-8;
+    if(!tabDrag)return;
+
+    tabDrag.currentX=e.clientX;
+
+    const inner=tabDrag.rect.width-10;
     const segment=inner/3;
-    const raw=(e.clientX-tabDrag.rect.left-4)/segment-.5;
+    const raw=(e.clientX-tabDrag.rect.left-5)/segment-.5;
     const clamped=Math.max(0,Math.min(2,raw));
+
     liquidIndicator.style.transform=`translateX(${clamped*100}%)`;
+    liquidTabs.style.setProperty('--tab-index',clamped);
 });
+
 liquidTabs.addEventListener('pointerup',e=>{
-    if(!tabDrag) return;
-    const segment=(tabDrag.rect.width-8)/3;
-    const idx=Math.max(0,Math.min(2,Math.floor((e.clientX-tabDrag.rect.left-4)/segment)));
+    if(!tabDrag)return;
+
+    const segment=(tabDrag.rect.width-10)/3;
+    const idx=Math.max(
+        0,
+        Math.min(
+            2,
+            Math.floor((e.clientX-tabDrag.rect.left-5)/segment)
+        )
+    );
+
+    const moved=Math.abs(e.clientX-tabDrag.startX);
+    const target=viewOrder[idx];
+
     tabDrag=null;
     liquidTabs.classList.remove('dragging');
     liquidIndicator.style.transform='';
-    setView(viewOrder[idx],{fromDrag:true});
+
+    if(target===currentView){
+        syncLiquidNav(currentView);
+        if(moved<8)spawnLiquidRipple(e.clientX,e.clientY);
+        return;
+    }
+
+    setView(target,{clientX:e.clientX,clientY:e.clientY});
 });
+
 liquidTabs.addEventListener('pointercancel',()=>{
     tabDrag=null;
     liquidTabs.classList.remove('dragging');
     liquidIndicator.style.transform='';
+    syncLiquidNav(currentView);
 });
 
 /* ---------- Render ---------- */
