@@ -1,11 +1,11 @@
 /* K-MUSIC V4 — Liquid Glass + Playlists */
 const $=id=>document.getElementById(id);
 const audio=$('audio'),musicInput=$('musicInput'),addMusic=$('addMusic'),addFirstMusic=$('addFirstMusic'),library=$('library'),search=$('search'),songCount=$('songCount');
-const sectionLabel=$('sectionLabel'),sectionTitle=$('sectionTitle'),newPlaylistTop=$('newPlaylistTop');
+const sectionLabel=$('sectionLabel'),sectionTitle=$('sectionTitle'),newPlaylistTop=$('newPlaylistTop'),importDeezerTop=$('importDeezerTop');
 const bottomLiquidNav=$('bottomLiquidNav'),liquidTabs=$('bottomLiquidShell'),liquidIndicator=$('liquidIndicator'),pageChrome=$('pageChrome');
 const miniPlayer=$('miniPlayer'),miniCover=$('miniCover'),miniTitle=$('miniTitle'),miniArtist=$('miniArtist'),miniPlay=$('miniPlay'),miniPrevious=$('miniPrevious'),miniNext=$('miniNext'),miniProgress=$('miniProgress'),miniEq=$('miniEq'),openPlayer=$('openPlayer');
 const playerScreen=$('playerScreen'),playerBackdrop=$('playerBackdrop'),closePlayer=$('closePlayer'),coverStage=$('coverStage'),bigCover=$('bigCover'),bigTitle=$('bigTitle'),bigArtist=$('bigArtist'),bigAlbum=$('bigAlbum'),playerFavorite=$('playerFavorite'),play=$('play'),previous=$('previous'),next=$('next'),shuffle=$('shuffle'),repeat=$('repeat'),progress=$('progress'),currentTime=$('currentTime'),duration=$('duration');
-const sheetBackdrop=$('sheetBackdrop'),playlistSheet=$('playlistSheet'),sheetTitle=$('sheetTitle'),sheetBody=$('sheetBody'),closeSheet=$('closeSheet');
+const sheetBackdrop=$('sheetBackdrop'),playlistSheet=$('playlistSheet'),sheetTitle=$('sheetTitle'),sheetBody=$('sheetBody'),closeSheet=$('closeSheet'),searchFilter=$('searchFilter');
 
 let songs=[],playlists=[],currentSong=-1,currentView='all',activePlaylistId=null;
 let shuffleEnabled=false,repeatEnabled=false,database=null,activeObjectUrl=null;
@@ -79,6 +79,7 @@ musicInput.addEventListener('change',async e=>{
         songs.push(song);
     }
     musicInput.value='';
+    await relinkDeezerPlaylists();
     render();
 });
 function readMetadata(file){
@@ -245,30 +246,181 @@ liquidTabs.addEventListener('pointercancel',()=>{
 
 /* ---------- Render ---------- */
 function render(){
+    const isDashboard=currentView==='all'&&!activePlaylistId;
+
+    pageChrome.classList.toggle('dashboard-hidden',isDashboard);
+
     newPlaylistTop.classList.toggle('hidden',currentView!=='playlists');
+    importDeezerTop.classList.toggle('hidden',currentView!=='playlists');
 
     if(activePlaylistId){
         renderPlaylistDetail();
         return;
     }
 
+    if(currentView==='all'){
+        renderDashboard();
+        return;
+    }
+
     if(currentView==='playlists'){
-        sectionLabel.textContent='COLLECTIONS';
+        sectionLabel.textContent='PLAYLISTS';
         sectionTitle.textContent='Mes playlists';
         songCount.textContent=`${playlists.length} ${playlists.length>1?'playlists':'playlist'}`;
         renderPlaylists();
         return;
     }
 
-    sectionLabel.textContent=currentView==='favorites'?'SÉLECTION':'COLLECTION';
-    sectionTitle.textContent=currentView==='favorites'?'Mes favoris':'Mes morceaux';
+    sectionLabel.textContent='FAVORIS';
+    sectionTitle.textContent='Mes favoris';
 
-    const base=currentView==='favorites'?songs.filter(s=>s.favorite):songs;
+    const base=songs.filter(s=>s.favorite);
     const q=search.value.trim().toLowerCase();
     const visible=base.filter(s=>`${s.title} ${s.artist} ${s.album}`.toLowerCase().includes(q));
 
     songCount.textContent=`${base.length} ${base.length>1?'morceaux':'morceau'}`;
     renderSongList(visible);
+}
+
+function renderDashboard(){
+    const q=search.value.trim().toLowerCase();
+    const filtered=songs.filter(s=>`${s.title} ${s.artist} ${s.album}`.toLowerCase().includes(q));
+
+    if(!songs.length){
+        library.innerHTML=`
+            <div class="dashboard-empty">
+                <div class="empty-symbol">♪</div>
+                <h3>Ta bibliothèque est vide</h3>
+                <p>Ajoute quelques morceaux et K-Music prendra exactement cette allure avec tes pochettes.</p>
+                <button class="primary-button pressable" id="dashboardAdd">Ajouter de la musique</button>
+            </div>`;
+        $('dashboardAdd')?.addEventListener('click',openFilePicker);
+        return;
+    }
+
+    const recent=filtered.slice().reverse().slice(0,8);
+    const favorites=filtered.filter(s=>s.favorite).slice(0,3);
+    const shownPlaylists=playlists.slice(0,7);
+
+    library.innerHTML=`
+        <div class="dashboard">
+            <section class="home-section">
+                <div class="home-section-head">
+                    <div class="home-title-wrap"><h2>Récents</h2><span class="section-chevron">›</span></div>
+                    <button class="see-all pressable" data-home-nav="all-songs">Tout voir</button>
+                </div>
+                <div class="horizontal-rail" id="recentRail"></div>
+            </section>
+
+            <section class="home-section">
+                <div class="home-section-head">
+                    <div class="home-title-wrap"><h2>Playlists</h2><span class="section-chevron">›</span></div>
+                    <button class="see-all pressable" data-home-nav="playlists">Tout voir</button>
+                </div>
+                <div class="horizontal-rail" id="playlistRail"></div>
+            </section>
+
+            <section class="home-section">
+                <div class="home-section-head">
+                    <div class="home-title-wrap"><h2>Favoris</h2><span class="section-chevron">›</span></div>
+                    <button class="see-all pressable" data-home-nav="favorites">Tout voir</button>
+                </div>
+                <div class="favorites-panel" id="favoritesHome"></div>
+            </section>
+        </div>`;
+
+    const recentRail=$('recentRail');
+    if(!recent.length){
+        recentRail.innerHTML=`<div class="dashboard-empty" style="grid-column:auto;width:280px;padding:28px 18px"><p>Aucun résultat.</p></div>`;
+    }else{
+        recent.forEach(song=>{
+            const index=songs.findIndex(s=>s.id===song.id);
+            const card=document.createElement('article');
+            card.className='recent-card';
+            card.innerHTML=`
+                <div class="recent-cover">${song.artwork?`<img src="${song.artwork}" alt="">`:`<div class="home-cover-placeholder">K</div>`}</div>
+                <div class="recent-meta">
+                    <strong>${escapeHTML(song.title)}</strong>
+                    <span>${escapeHTML(song.artist)}</span>
+                    <button class="card-more pressable" aria-label="Options">•••</button>
+                </div>`;
+            card.addEventListener('click',e=>{
+                if(e.target.closest('.card-more'))return;
+                playSong(index);
+            });
+            card.querySelector('.card-more').addEventListener('click',e=>{
+                e.stopPropagation();
+                openSongQuickSheet(index);
+            });
+            recentRail.appendChild(card);
+        });
+    }
+
+    const playlistRail=$('playlistRail');
+
+    const createCard=document.createElement('article');
+    createCard.className='create-home-playlist pressable';
+    createCard.innerHTML=`<div class="create-home-plus">+</div><strong>Créer une<br>playlist</strong>`;
+    createCard.addEventListener('click',openCreatePlaylistSheet);
+    playlistRail.appendChild(createCard);
+
+    shownPlaylists.forEach(playlist=>{
+        const pSongs=playlist.songIds.map(id=>songs.find(s=>s.id===id)).filter(Boolean);
+        const card=document.createElement('article');
+        card.className='home-playlist-card';
+        card.innerHTML=`
+            <div class="home-playlist-cover">${playlistMosaicHTML(pSongs)}</div>
+            <div class="home-playlist-meta">
+                <strong>${escapeHTML(playlist.name)}</strong>
+                <span>${pSongs.length} ${pSongs.length>1?'morceaux':'morceau'}</span>
+                <button class="card-more pressable" aria-label="Options">•••</button>
+            </div>`;
+        card.addEventListener('click',e=>{
+            if(e.target.closest('.card-more'))return;
+            currentView='playlists';
+            syncLiquidNav('playlists');
+            activePlaylistId=playlist.id;
+            render();
+        });
+        card.querySelector('.card-more').addEventListener('click',e=>{
+            e.stopPropagation();
+            openPlaylistOptionsSheet(playlist.id);
+        });
+        playlistRail.appendChild(card);
+    });
+
+    const favoritesHome=$('favoritesHome');
+    if(!favorites.length){
+        favoritesHome.innerHTML=`<div class="dashboard-empty" style="border:0;background:transparent;box-shadow:none;padding:30px 16px"><p>Ajoute un cœur à tes morceaux préférés.</p></div>`;
+    }else{
+        favorites.forEach(song=>{
+            const index=songs.findIndex(s=>s.id===song.id);
+            const row=document.createElement('div');
+            row.className='favorite-home-row';
+            row.innerHTML=`
+                <div class="favorite-home-cover">${song.artwork?`<img src="${song.artwork}" alt="">`:'♪'}</div>
+                <div class="favorite-home-copy"><strong>${escapeHTML(song.title)}</strong><span>${escapeHTML(song.artist)}</span></div>
+                <button class="favorite-home-heart pressable" aria-label="Favori">♥</button>
+                <button class="favorite-home-more pressable" aria-label="Options">•••</button>`;
+            row.addEventListener('click',e=>{
+                if(e.target.closest('button'))return;
+                playSong(index);
+            });
+            row.querySelector('.favorite-home-heart').addEventListener('click',e=>{
+                e.stopPropagation();
+                toggleFavorite(index);
+            });
+            row.querySelector('.favorite-home-more').addEventListener('click',e=>{
+                e.stopPropagation();
+                openSongQuickSheet(index);
+            });
+            favoritesHome.appendChild(row);
+        });
+    }
+
+    document.querySelector('[data-home-nav="playlists"]')?.addEventListener('click',e=>setView('playlists',{clientX:e.clientX,clientY:e.clientY}));
+    document.querySelector('[data-home-nav="favorites"]')?.addEventListener('click',e=>setView('favorites',{clientX:e.clientX,clientY:e.clientY}));
+    document.querySelector('[data-home-nav="all-songs"]')?.addEventListener('click',()=>openAllSongsSheet());
 }
 
 function renderSongList(list,playlist=null){
@@ -306,6 +458,12 @@ function renderPlaylists(){
     create.innerHTML=`<div class="playlist-mosaic"><span class="big-plus">+</span></div><h3>Nouvelle playlist</h3><p>Créer une collection</p>`;
     create.addEventListener('click',openCreatePlaylistSheet);
     grid.appendChild(create);
+
+    const deezer=document.createElement('article');
+    deezer.className='playlist-card deezer-import-card';
+    deezer.innerHTML=`<div class="playlist-mosaic"><span class="deezer-mark">D</span></div><h3>Importer Deezer</h3><p>Depuis un lien de playlist</p>`;
+    deezer.addEventListener('click',openDeezerImportSheet);
+    grid.appendChild(deezer);
 
     visible.forEach((playlist,i)=>{
         const card=document.createElement('article');
@@ -376,6 +534,331 @@ function renderPlaylistDetail(){
 
 search.addEventListener('input',render);
 
+
+/* ---------- Deezer import ---------- */
+importDeezerTop.addEventListener('click',openDeezerImportSheet);
+
+function openDeezerImportSheet(){
+    showSheet('Importer depuis Deezer',`
+        <p class="deezer-help">
+            Colle le lien d’une playlist Deezer publique. K-Music importe son nom et sa liste de morceaux,
+            puis associe automatiquement les titres déjà présents dans ta bibliothèque.
+        </p>
+        <input id="deezerUrlInput" class="playlist-name-input" inputmode="url"
+               placeholder="https://www.deezer.com/playlist/..." autocomplete="off">
+        <button id="deezerFetchButton" class="sheet-primary pressable">Analyser la playlist</button>
+        <div id="deezerImportStatus" class="deezer-import-status"></div>
+        <div id="deezerImportResult"></div>
+    `);
+
+    $('deezerFetchButton').addEventListener('click',analyseDeezerPlaylist);
+}
+
+function extractDeezerPlaylistId(value){
+    const text=String(value||'').trim();
+
+    const urlMatch=text.match(/deezer\.com\/(?:[a-z]{2}\/)?playlist\/(\d+)/i);
+    if(urlMatch)return urlMatch[1];
+
+    if(/^\d+$/.test(text))return text;
+
+    return null;
+}
+
+async function analyseDeezerPlaylist(){
+    const input=$('deezerUrlInput');
+    const status=$('deezerImportStatus');
+    const result=$('deezerImportResult');
+    const button=$('deezerFetchButton');
+
+    const playlistId=extractDeezerPlaylistId(input.value);
+
+    if(!playlistId){
+        status.textContent='Lien Deezer non reconnu.';
+        return;
+    }
+
+    status.textContent='Lecture de la playlist Deezer…';
+    result.innerHTML='';
+    button.disabled=true;
+    button.style.opacity='.55';
+
+    try{
+        const data=await fetchDeezerPlaylistData(playlistId);
+
+        if(!data||!data.tracks||!data.tracks.length){
+            throw new Error('Playlist vide ou inaccessible');
+        }
+
+        const mapped=data.tracks.map(track=>{
+            const local=findLocalSongForDeezerTrack(track);
+            return {track,local};
+        });
+
+        const matched=mapped.filter(x=>x.local).length;
+        const preview=mapped.slice(0,8).map(({track,local})=>`
+            <div class="deezer-track-preview">
+                ${track.cover?`<img src="${track.cover}" alt="">`:`<div class="sheet-song-cover">♪</div>`}
+                <div class="dz-copy">
+                    <b>${escapeHTML(track.title)}</b>
+                    <span>${escapeHTML(track.artist)}</span>
+                </div>
+                <span class="deezer-match ${local?'ok':'missing'}">${local?'✓ trouvé':'manquant'}</span>
+            </div>
+        `).join('');
+
+        status.textContent='';
+        result.innerHTML=`
+            <div class="deezer-result">
+                <strong>${escapeHTML(data.name)}</strong>
+                <p>${data.tracks.length} morceaux Deezer • ${matched} déjà présents dans K-Music</p>
+                <div>${preview}</div>
+                ${data.tracks.length>8?`<p>+ ${data.tracks.length-8} autres morceaux</p>`:''}
+            </div>
+            <button id="confirmDeezerImport" class="sheet-primary pressable" style="margin-top:12px">
+                Créer la playlist
+            </button>
+            <button id="cancelDeezerImport" class="sheet-secondary pressable">Annuler</button>
+        `;
+
+        $('confirmDeezerImport').addEventListener('click',()=>confirmDeezerImport(data,mapped));
+        $('cancelDeezerImport').addEventListener('click',hideSheet);
+    }catch(error){
+        console.error(error);
+        status.innerHTML=`Impossible de lire directement cette playlist depuis Safari.<br>
+        Essaie une playlist publique. Si Deezer bloque la requête navigateur, utilise l’import JSON proposé ci-dessous.`;
+
+        result.innerHTML=`
+            <button id="deezerJsonFallback" class="sheet-secondary pressable">
+                Importer un fichier JSON Deezer
+            </button>
+            <input id="deezerJsonInput" type="file" accept=".json,application/json" hidden>
+        `;
+
+        $('deezerJsonFallback').addEventListener('click',()=>$('deezerJsonInput').click());
+        $('deezerJsonInput').addEventListener('change',handleDeezerJsonFallback);
+    }finally{
+        button.disabled=false;
+        button.style.opacity='';
+    }
+}
+
+async function fetchDeezerPlaylistData(id){
+    /*
+      Deezer's public playlist endpoint is useful for metadata, but direct browser
+      fetches can be blocked by CORS. Try the direct request first so K-Music
+      remains serverless; if Safari rejects it, the UI offers JSON import.
+    */
+    const playlistRes=await fetch(`https://api.deezer.com/playlist/${id}`);
+    if(!playlistRes.ok)throw new Error(`Deezer ${playlistRes.status}`);
+
+    const playlist=await playlistRes.json();
+    if(playlist.error)throw new Error(playlist.error.message||'Erreur Deezer');
+
+    let tracks=[];
+    let page=playlist.tracks;
+
+    while(page){
+        if(Array.isArray(page.data))tracks.push(...page.data);
+        if(!page.next)break;
+
+        const nextRes=await fetch(page.next);
+        if(!nextRes.ok)break;
+        page=await nextRes.json();
+    }
+
+    return {
+        id:String(id),
+        name:playlist.title||`Playlist Deezer ${id}`,
+        picture:playlist.picture_xl||playlist.picture_big||playlist.picture_medium||null,
+        tracks:tracks.map(normalizeDeezerTrack)
+    };
+}
+
+function normalizeDeezerTrack(track){
+    return {
+        deezerId:String(track.id||''),
+        title:track.title_short||track.title||'Titre inconnu',
+        artist:track.artist?.name||'Artiste inconnu',
+        album:track.album?.title||'Album inconnu',
+        cover:track.album?.cover_big||track.album?.cover_medium||track.album?.cover||null
+    };
+}
+
+function normalizeMatchText(value){
+    return String(value||'')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g,'')
+        .replace(/\([^)]*\)|\[[^\]]*\]/g,' ')
+        .replace(/\b(feat|ft|featuring)\b.*$/i,' ')
+        .replace(/[^a-z0-9]+/g,' ')
+        .trim();
+}
+
+function findLocalSongForDeezerTrack(track){
+    const dt=normalizeMatchText(track.title);
+    const da=normalizeMatchText(track.artist);
+
+    let best=null;
+    let bestScore=0;
+
+    for(const song of songs){
+        const st=normalizeMatchText(song.title);
+        const sa=normalizeMatchText(song.artist);
+        let score=0;
+
+        if(st===dt)score+=7;
+        else if(st.includes(dt)||dt.includes(st))score+=4;
+
+        if(sa===da)score+=5;
+        else if(sa.includes(da)||da.includes(sa))score+=2;
+
+        if(score>bestScore){
+            bestScore=score;
+            best=song;
+        }
+    }
+
+    return bestScore>=8?best:null;
+}
+
+async function confirmDeezerImport(data,mapped){
+    const matchedIds=mapped.filter(x=>x.local).map(x=>x.local.id);
+
+    const playlist={
+        id:crypto.randomUUID(),
+        name:data.name,
+        songIds:[...new Set(matchedIds)],
+        createdAt:Date.now(),
+        source:'deezer',
+        deezerPlaylistId:data.id||null,
+        deezerPicture:data.picture||null,
+        deezerTracks:mapped.map(({track,local})=>({
+            ...track,
+            localSongId:local?.id||null
+        }))
+    };
+
+    await dbPut('playlists',playlist);
+    playlists.push(playlist);
+
+    hideSheet();
+    currentView='playlists';
+    syncLiquidNav('playlists');
+    activePlaylistId=playlist.id;
+    render();
+
+    if(mapped.some(x=>!x.local)){
+        setTimeout(()=>openMissingTracksSheet(playlist.id),350);
+    }
+}
+
+function openMissingTracksSheet(playlistId){
+    const playlist=playlists.find(p=>p.id===playlistId);
+    if(!playlist||!Array.isArray(playlist.deezerTracks))return;
+
+    const missing=playlist.deezerTracks.filter(t=>!t.localSongId);
+    if(!missing.length)return;
+
+    showSheet('Morceaux manquants',`
+        <p class="deezer-help">
+            ${missing.length} morceau${missing.length>1?'x':''} de Deezer ne ${missing.length>1?'sont':'est'} pas encore dans K-Music.
+            Ajoute tes fichiers audio plus tard : K-Music pourra les rattacher à la playlist.
+        </p>
+        <div class="sheet-song-list">
+            ${missing.slice(0,50).map(track=>`
+                <div class="sheet-song">
+                    <div class="sheet-song-cover">${track.cover?`<img src="${track.cover}" alt="">`:'♪'}</div>
+                    <div class="sheet-song-copy">
+                        <strong>${escapeHTML(track.title)}</strong>
+                        <span>${escapeHTML(track.artist)}</span>
+                    </div>
+                    <span class="deezer-match missing">manquant</span>
+                </div>
+            `).join('')}
+        </div>
+        <button id="closeMissingTracks" class="sheet-primary pressable" style="margin-top:12px">Compris</button>
+    `);
+
+    $('closeMissingTracks').addEventListener('click',hideSheet);
+}
+
+async function handleDeezerJsonFallback(event){
+    const file=event.target.files?.[0];
+    if(!file)return;
+
+    const status=$('deezerImportStatus');
+
+    try{
+        const raw=JSON.parse(await file.text());
+        const source=raw.data?raw:(raw.tracks||raw.title?raw:null);
+        if(!source)throw new Error('Format JSON non reconnu');
+
+        let rawTracks=[];
+        let name='Playlist Deezer';
+
+        if(Array.isArray(raw.data)){
+            rawTracks=raw.data;
+        }else if(Array.isArray(raw.tracks?.data)){
+            rawTracks=raw.tracks.data;
+            name=raw.title||name;
+        }else if(Array.isArray(raw.tracks)){
+            rawTracks=raw.tracks;
+            name=raw.title||raw.name||name;
+        }else{
+            throw new Error('Aucun morceau trouvé');
+        }
+
+        const data={
+            id:null,
+            name,
+            picture:raw.picture_xl||raw.picture_big||null,
+            tracks:rawTracks.map(normalizeDeezerTrack)
+        };
+
+        const mapped=data.tracks.map(track=>({
+            track,
+            local:findLocalSongForDeezerTrack(track)
+        }));
+
+        await confirmDeezerImport(data,mapped);
+    }catch(error){
+        console.error(error);
+        status.textContent='Ce fichier JSON ne ressemble pas à un export Deezer.';
+    }
+}
+
+async function relinkDeezerPlaylists(){
+    let changed=false;
+
+    for(const playlist of playlists){
+        if(!Array.isArray(playlist.deezerTracks))continue;
+
+        let playlistChanged=false;
+
+        for(const track of playlist.deezerTracks){
+            if(track.localSongId&&songs.some(s=>s.id===track.localSongId))continue;
+
+            const local=findLocalSongForDeezerTrack(track);
+
+            if(local){
+                track.localSongId=local.id;
+                if(!playlist.songIds.includes(local.id))playlist.songIds.push(local.id);
+                playlistChanged=true;
+            }
+        }
+
+        if(playlistChanged){
+            await dbPut('playlists',playlist);
+            changed=true;
+        }
+    }
+
+    if(changed)render();
+}
+
+
 /* ---------- Playlist sheets ---------- */
 newPlaylistTop.addEventListener('click',openCreatePlaylistSheet);
 closeSheet.addEventListener('click',hideSheet);
@@ -440,6 +923,61 @@ function openPlaylistOptionsSheet(id){
         hideSheet();render();
     });
 }
+
+
+function openAllSongsSheet(){
+    showSheet('Tous les morceaux',`
+        <div class="sheet-song-list" id="allSongsSheet"></div>
+    `);
+
+    const host=$('allSongsSheet');
+
+    songs.forEach(song=>{
+        const index=songs.findIndex(s=>s.id===song.id);
+        const row=document.createElement('div');
+        row.className='sheet-song';
+        row.innerHTML=`
+            <div class="sheet-song-cover">${song.artwork?`<img src="${song.artwork}" alt="">`:'♪'}</div>
+            <div class="sheet-song-copy"><strong>${escapeHTML(song.title)}</strong><span>${escapeHTML(song.artist)}</span></div>
+            <div class="sheet-check" style="color:#9c8cb8;background:transparent;border:0">▶</div>`;
+        row.addEventListener('click',()=>{
+            hideSheet();
+            playSong(index);
+        });
+        host.appendChild(row);
+    });
+}
+
+function openSongQuickSheet(index){
+    const song=songs[index];
+    if(!song)return;
+
+    showSheet(song.title,`
+        <div class="playlist-detail-head" style="margin-top:0">
+            <div class="playlist-detail-cover">${song.artwork?`<img src="${song.artwork}" alt="">`:'K'}</div>
+            <div class="playlist-detail-copy">
+                <h3>${escapeHTML(song.title)}</h3>
+                <p>${escapeHTML(song.artist)}</p>
+            </div>
+        </div>
+        <button id="quickPlay" class="sheet-primary pressable">Lire</button>
+        <button id="quickFavorite" class="sheet-secondary pressable">${song.favorite?'Retirer des favoris':'Ajouter aux favoris'}</button>
+    `);
+
+    $('quickPlay').addEventListener('click',()=>{
+        hideSheet();
+        playSong(index);
+    });
+
+    $('quickFavorite').addEventListener('click',async()=>{
+        await toggleFavorite(index);
+        hideSheet();
+    });
+}
+
+searchFilter.addEventListener('click',()=>{
+    search.focus();
+});
 
 /* ---------- Favorites ---------- */
 async function toggleFavorite(index){
