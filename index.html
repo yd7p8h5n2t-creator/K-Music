@@ -10,7 +10,7 @@
     <title>K-Music</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
     <div class="ambient" aria-hidden="true">
@@ -30,31 +30,38 @@
         </header>
 
         <main>
-            <section class="hero-panel glass-panel">
-                <div class="hero-copy">
-                    <div class="hero-kicker">BIBLIOTHÈQUE PERSONNELLE</div>
-                    <h2>Tout ton son.<br><span>Sans distraction.</span></h2>
-                </div>
-                <div class="hero-badge">
-                    <div class="hero-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-                    <span id="heroCount">0 titre</span>
-                </div>
-            </section>
-
             <div class="search-box glass-panel">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.2-4.2m1.2-5.3a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z"/></svg>
                 <input type="search" id="search" placeholder="Titre, artiste, album…" autocomplete="off">
                 <span class="search-shortcut">K</span>
             </div>
 
-            <div class="section-header">
-                <div><span class="section-label">COLLECTION</span><h2>Mes morceaux</h2></div>
-                <span id="songCount" class="song-count">0 morceau</span>
+            <div class="section-header library-heading">
+                <div>
+                    <span class="section-label" id="sectionLabel">COLLECTION</span>
+                    <h2 id="sectionTitle">Mes morceaux</h2>
+                </div>
+
+                <div class="section-actions">
+                    <span id="songCount" class="song-count">0 morceau</span>
+                    <button id="newPlaylistTop" class="tiny-add pressable hidden" aria-label="Créer une playlist">+</button>
+                </div>
             </div>
 
-            <div class="filters" role="tablist">
-                <button class="filter active pressable" data-filter="all" role="tab"><span class="filter-dot"></span>Tous</button>
-                <button class="filter pressable" data-filter="favorites" role="tab"><span>♥</span>Favoris</button>
+            <div class="liquid-tabs" id="liquidTabs" role="tablist" aria-label="Navigation bibliothèque">
+                <div class="liquid-indicator" id="liquidIndicator"></div>
+
+                <button class="liquid-tab active" data-view="all" role="tab" aria-selected="true">
+                    <span>Musique</span>
+                </button>
+
+                <button class="liquid-tab" data-view="playlists" role="tab" aria-selected="false">
+                    <span>Playlists</span>
+                </button>
+
+                <button class="liquid-tab" data-view="favorites" role="tab" aria-selected="false">
+                    <span>Favoris</span>
+                </button>
             </div>
 
             <section id="library" class="library">
@@ -126,9 +133,26 @@
         </div>
     </div>
 
+    <div class="sheet-backdrop" id="sheetBackdrop" aria-hidden="true"></div>
+
+    <section class="bottom-sheet" id="playlistSheet" aria-hidden="true">
+        <div class="sheet-handle"></div>
+
+        <div class="sheet-header">
+            <div>
+                <span class="section-label">PLAYLIST</span>
+                <h3 id="sheetTitle">Nouvelle playlist</h3>
+            </div>
+
+            <button class="sheet-close pressable" id="closeSheet" aria-label="Fermer">×</button>
+        </div>
+
+        <div class="sheet-body" id="sheetBody"></div>
+    </section>
+
     <audio id="audio" preload="metadata"></audio>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
     <script>
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("./sw.js")
