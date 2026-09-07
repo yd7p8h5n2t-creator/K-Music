@@ -99,6 +99,20 @@ function readMetadata(file){
     });
 }
 
+
+// iOS-safe navigation: event delegation keeps taps working even if the
+// individual tab listeners or pointer gestures are interrupted by Safari.
+if(liquidTabs){
+    liquidTabs.addEventListener('click',event=>{
+        const tab=event.target.closest('.liquid-tab');
+        if(!tab)return;
+        const view=tab.dataset.view;
+        if(!view)return;
+        event.preventDefault();
+        setView(view,{clientX:event.clientX,clientY:event.clientY});
+    });
+}
+
 /* ---------- Bottom Liquid Glass navigation ---------- */
 const viewOrder=['all','playlists','favorites'];
 let isTransitioning=false;
@@ -126,32 +140,27 @@ function spawnLiquidRipple(clientX,clientY){
     ripple.addEventListener('animationend',()=>ripple.remove(),{once:true});
 }
 
-async function setView(view,{clientX,clientY,skipTransition=false}={}){
-    if(view===currentView&&!activePlaylistId){
-        syncLiquidNav(view);
-        if(Number.isFinite(clientX)&&Number.isFinite(clientY))spawnLiquidRipple(clientX,clientY);
-        return;
-    }
+function setView(view,options={}){
+    const clientX=options.clientX;
+    const clientY=options.clientY;
 
-    if(Number.isFinite(clientX)&&Number.isFinite(clientY))spawnLiquidRipple(clientX,clientY);
+    if(Number.isFinite(clientX)&&Number.isFinite(clientY)){
+        try{ spawnLiquidRipple(clientX,clientY); }catch(e){}
+    }
 
     activePlaylistId=null;
     currentView=view;
-    syncLiquidNav(view);
 
-    pageStage.classList.remove(
-        'page-exit-left','page-exit-right','page-enter-left','page-enter-right','km-page-fade'
-    );
-    pageChrome.classList.remove(
-        'page-exit-left','page-exit-right','page-enter-left','page-enter-right'
-    );
-
+    try{ syncLiquidNav(view); }catch(e){}
     render();
 
-    if(!skipTransition&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
-        void pageStage.offsetWidth;
-        pageStage.classList.add('km-page-fade');
-        setTimeout(()=>pageStage.classList.remove('km-page-fade'),240);
+    // Purely visual transition. Navigation must never depend on animation support.
+    if(!options.skipTransition && pageStage){
+        pageStage.classList.remove('km-page-fade');
+        requestAnimationFrame(()=>{
+            pageStage.classList.add('km-page-fade');
+            window.setTimeout(()=>pageStage.classList.remove('km-page-fade'),220);
+        });
     }
 }
 
